@@ -261,17 +261,16 @@ function createServer() {
 const app = express();
 app.use(express.json());
 
-// Auth middleware — all routes except /health require a valid API key.
-// Accepted via: X-API-Key header (Claude Desktop) or ?api_key= query param (claude.ai web).
+// Auth middleware — all routes except /health require X-API-Key
 app.use((req, res, next) => {
   if (req.path === '/health') return next();
+  const key = req.headers['x-api-key'];
   if (!process.env.MCP_API_KEY) {
     res.status(500).json({ error: 'MCP_API_KEY not configured on server' });
     return;
   }
-  const key = req.headers['x-api-key'] ?? req.query['api_key'];
   if (key !== process.env.MCP_API_KEY) {
-    res.status(401).json({ error: 'Unauthorized: invalid or missing API key' });
+    res.status(401).json({ error: 'Unauthorized: invalid or missing X-API-Key' });
     return;
   }
   next();
