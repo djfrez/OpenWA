@@ -34,7 +34,9 @@ RUN printf 'server {\n\
     }\n\
 \n\
     location /mcp {\n\
-        proxy_pass http://mcp-server:3000/;\n\
+        rewrite ^/mcp(/.*)$ $1 break;\n\
+        rewrite ^/mcp$ / break;\n\
+        proxy_pass http://mcp-server:3000;\n\
         proxy_http_version 1.1;\n\
         proxy_set_header Host $host;\n\
         proxy_set_header X-Real-IP $remote_addr;\n\
