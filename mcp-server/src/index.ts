@@ -261,9 +261,9 @@ function createServer() {
 const app = express();
 app.use(express.json());
 
-// Auth middleware — all routes except /health require X-API-Key
+// Auth middleware — /health and /webhook are public; everything else requires X-API-Key
 app.use((req, res, next) => {
-  if (req.path === '/health') return next();
+  if (req.path === '/health' || req.path === '/webhook') return next();
   const key = req.headers['x-api-key'];
   if (!process.env.MCP_API_KEY) {
     res.status(500).json({ error: 'MCP_API_KEY not configured on server' });
@@ -274,6 +274,42 @@ app.use((req, res, next) => {
     return;
   }
   next();
+});
+
+// ── WEBHOOK RECEIVER ─────────────────────────────────────────────────────────
+// Receives events from OpenWA and forwards session disconnect alerts to Telegram.
+// No API key required — called by OpenWA internally.
+
+app.post('/webhook', async (req, res) => {
+  try {
+    const event = req.body;
+    const eventName: string = event?.event ?? event?.type ?? '';
+    const isDisconnect = eventName === 'session.disconnected' || eventName === 'disconnected';
+
+    if (isDisconnect) {
+      const sessionId: string = event?.sessionId ?? event?.session ?? 'unknown';
+      const token = process.env.TELEGRAM_BOT_TOKEN;
+      const chatId = process.env.TELEGRAM_CHAT_ID;
+
+      if (token && chatId) {
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: `⚠️ *OpenWA Alert*\nSession \`${sessionId}\` disconnected.\n\nReconnect at https://wa.qurt.com.br`,
+            parse_mode: 'Markdown',
+          }),
+        });
+      } else {
+        console.warn('Telegram credentials not configured — skipping disconnect alert');
+      }
+    }
+  } catch (err) {
+    console.error('Webhook handler error:', err);
+  }
+
+  res.json({ ok: true });
 });
 
 app.all('/', async (req, res) => {
