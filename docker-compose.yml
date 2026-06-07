@@ -109,8 +109,35 @@ services:
       - '80'
     depends_on:
       - openwa-api
+      - mcp-server
     labels:
       - 'com.openwa.service=dashboard'
+      - 'com.openwa.core=true'
+
+  # ===== CORE: MCP Server =====
+  mcp-server:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    container_name: openwa-mcp
+    profiles: ['with-dashboard', 'full']
+    restart: unless-stopped
+    expose:
+      - '3000'
+    environment:
+      - OPENWA_BASE_URL=http://openwa-api:2785
+      - OPENWA_API_KEY=${OPENWA_API_KEY:-}
+      - PORT=3000
+    depends_on:
+      - openwa-api
+    healthcheck:
+      test: ['CMD', 'node', '-e', "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    labels:
+      - 'com.openwa.service=mcp'
       - 'com.openwa.core=true'
 
   # ===== OPTIONAL: Built-in PostgreSQL =====
