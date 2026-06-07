@@ -261,6 +261,21 @@ function createServer() {
 const app = express();
 app.use(express.json());
 
+// Auth middleware — all routes except /health require X-API-Key
+app.use((req, res, next) => {
+  if (req.path === '/health') return next();
+  const key = req.headers['x-api-key'];
+  if (!process.env.MCP_API_KEY) {
+    res.status(500).json({ error: 'MCP_API_KEY not configured on server' });
+    return;
+  }
+  if (key !== process.env.MCP_API_KEY) {
+    res.status(401).json({ error: 'Unauthorized: invalid or missing X-API-Key' });
+    return;
+  }
+  next();
+});
+
 app.all('/', async (req, res) => {
   const server = createServer();
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
