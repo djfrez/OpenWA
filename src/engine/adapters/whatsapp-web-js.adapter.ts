@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import { Client, LocalAuth, MessageMedia } from 'whatsapp-web.js';
 import * as qrcode from 'qrcode';
 import * as path from 'path';
+import * as fs from 'fs';
 import {
   IWhatsAppEngine,
   EngineStatus,
@@ -100,10 +101,31 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
       });
 
       this.setupEventHandlers();
+      this.clearStaleChromeLocks();
       await this.client.initialize();
     } catch (error) {
       this.setStatus(EngineStatus.FAILED);
       throw error;
+    }
+  }
+
+  // When the container is killed (e.g. a redeploy), Chromium does not shut down
+  // cleanly and leaves Singleton* lock files in the LocalAuth profile dir. On the
+  // next /start, restoring the saved session fails because Chromium sees the profile
+  // as "already in use" and the launch crashes (surfaces as a 500). LocalAuth keys
+  // its userDataDir as <dataPath>/session-<clientId>; remove the stale locks there
+  // before launching so a persisted session can be restored without a re-scan.
+  private clearStaleChromeLocks(): void {
+    try {
+      const profileDir = path.join(
+        path.resolve(this.config.sessionDataPath),
+        `session-${this.config.sessionId}`,
+      );
+      for (const lock of ['SingletonLock', 'SingletonCookie', 'SingletonSocket']) {
+        fs.rmSync(path.join(profileDir, lock), { force: true, recursive: true });
+      }
+    } catch (error) {
+      this.logger.warn(`Could not clear stale Chrome locks: ${String(error)}`);
     }
   }
 
