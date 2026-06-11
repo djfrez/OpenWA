@@ -1,22 +1,56 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiProperty } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsArray, ArrayNotEmpty, MaxLength } from 'class-validator';
 import { SessionService } from '../session/session.service';
 
 // DTOs
+//
+// These properties MUST carry class-validator decorators: the app runs a global
+// ValidationPipe with { whitelist: true, forbidNonWhitelisted: true } (see main.ts),
+// which strips and then rejects any property lacking a validation decorator. Without
+// them every request body here 400s with "property ... should not exist".
 class CreateGroupDto {
+  @ApiProperty({ description: 'Group name/subject', example: 'Grupo Teste RH' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
   name: string;
+
+  @ApiProperty({
+    description: 'Participant chat IDs (phone@c.us). Bare numbers are normalized to @c.us.',
+    example: ['5519993117953@c.us', '5519992297507@c.us'],
+    type: [String],
+  })
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsString({ each: true })
   participants: string[];
 }
 
 class ParticipantsDto {
+  @ApiProperty({
+    description: 'Participant chat IDs',
+    example: ['5519993117953@c.us'],
+    type: [String],
+  })
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsString({ each: true })
   participants: string[];
 }
 
 class GroupSubjectDto {
+  @ApiProperty({ description: 'New group subject', example: 'Novo nome do grupo' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
   subject: string;
 }
 
 class GroupDescriptionDto {
+  @ApiProperty({ description: 'New group description', example: 'Descrição do grupo' })
+  @IsString()
+  @MaxLength(512)
   description: string;
 }
 
